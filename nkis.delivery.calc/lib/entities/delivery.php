@@ -17,6 +17,9 @@ class Delivery  {
         }
     }
 
+    /**
+     * @return array
+     */
     public function getDeliveryList()
     {
         $deliveryList = [];

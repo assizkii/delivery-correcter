@@ -1,6 +1,7 @@
 <?php
 namespace NKis\DeliveryCalc;
 
+use Bitrix\Main\LoaderException;
 use Bitrix\Sale\Location as bxLocation;
 use Bitrix\Main\Loader;
 
@@ -10,7 +11,11 @@ class Location  {
 
     public function __construct()
     {
-        Loader::includeModule('sale');
+        try {
+            Loader::includeModule('sale');
+        } catch (LoaderException $e) {
+            die($e->getMessage());
+        }
     }
 
     /**

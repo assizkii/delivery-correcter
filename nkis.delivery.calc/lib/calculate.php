@@ -1,13 +1,22 @@
 <?php
 namespace NKis\DeliveryCalc;
+
 use Bitrix\Main\ArgumentNullException;
 use Bitrix\Main\Config\Option;
 use Bitrix\Main\Diag\Debug;
 use Bitrix\Main\Loader;
 use Bitrix\Main\LoaderException;
 
+/**
+ * Class Calculate
+ * @package NKis\DeliveryCalc
+ */
 class Calculate {
 
+    /**
+     * Контролирует выключение рассчета для терминальной доставки
+     * @var
+     */
     private static $isTerminalCalc;
 
     private $settings = [
@@ -22,6 +31,9 @@ class Calculate {
 
     private $moduleId = 'nkis.delivery.calc';
 
+    /**
+     * Calculate constructor.
+     */
     public function __construct()
     {
         try {
@@ -34,8 +46,11 @@ class Calculate {
         }
     }
 
+    /**
+     *  Вклиниваемся в событие рассчета стоимости
+     * @param \Bitrix\Main\Event $event
+     */
     public static function onSaleDeliveryServiceCalculate(\Bitrix\Main\Event $event)
-
     {
         $result = $event->getParameter('RESULT');
         $obShipmentItemCollection = $event->getParameter('SHIPMENT')->getShipmentItemCollection();
@@ -46,26 +61,34 @@ class Calculate {
 
         $order  = $shipment->getCollection()->getOrder();
 
-        global  $USER;
-        if ($USER->isAdmin()) {
-            $calculate = new Calculate();
-            $isFree = $calculate->check($order, $deliveryId);
+        $calculate = new Calculate();
 
-            if ($isFree && !self::$isTerminalCalc) {
+        // проверяем можно ли проходят ли условия для включения кастомной цены
+        $isFree = $calculate->check($order, $deliveryId);
 
-                $profiles = $calculate->getSyncProfile();
-                if (isset($profiles[$deliveryId])) {
-                    $terminalId = $profiles[$deliveryId];
-                    self::$isTerminalCalc = true;
-                    $terminalInfo = \Bitrix\Sale\Delivery\Services\Manager::calculateDeliveryPrice($shipment, $terminalId, []);
-                    $terminalPrice = $terminalInfo->getDeliveryPrice();
+        if ($isFree && !self::$isTerminalCalc) {
 
-                    $result->setDeliveryPrice($basePrice-$terminalPrice);
-                } else {
-                    $result->setDeliveryPrice(0);
-                }
+            $profiles = $calculate->getSyncProfile();
+
+            // Считаем разницу между терминальной и адресной доставкой
+            if (isset($profiles[$deliveryId])) {
+
+                $terminalId = $profiles[$deliveryId];
+
+                self::$isTerminalCalc = true;
+
+                $terminalInfo = \Bitrix\Sale\Delivery\Services\Manager::calculateDeliveryPrice($shipment, $terminalId, []);
+
+                $terminalPrice = $terminalInfo->getDeliveryPrice();
+                $result->setDeliveryPrice($basePrice-$terminalPrice);
+
+            } else {
+
+                $result->setDeliveryPrice((int)$calculate->settings['price']);
+
             }
         }
+
 
         self::$isTerminalCalc = false;
 
@@ -76,6 +99,12 @@ class Calculate {
         );
     }
 
+    /**
+     * Проверяем все условия для включения корректора
+     * @param $order
+     * @param $deliveryId
+     * @return bool
+     */
     public function check($order, $deliveryId)
     {
         $basket = $order->getBasket();
@@ -89,22 +118,33 @@ class Calculate {
         return true;
     }
 
+    /**
+     * @return array
+     * Получаем массив АДРЕСНАЯ - ТЕРМИНАЛЬНАЯ
+     */
     private function getSyncProfile()
     {
         $result = [];
+
         foreach ($this->settings['sync'] as $profiles) {
             $profile = explode(':', $profiles);
             $result[$profile[0]] = $profile[1];
         }
+
         return $result;
     }
 
+    /**
+     * Корректировка включена?
+     * @return bool
+     */
     private function checkSwitch()
     {
         return $this->settings['switch'] === 'Y';
     }
 
     /**
+     * Проверка региона
      * @param $order
      * @return bool
      */
@@ -127,6 +167,7 @@ class Calculate {
     }
 
     /**
+     * Проверка службы доставки
      * @param $deliveryId
      * @return bool
      */
@@ -135,16 +176,19 @@ class Calculate {
         if (in_array($deliveryId, $this->settings['deliveries'])) {
             return true;
         }
+
         return false;
     }
 
     /**
+     * Проверка категории продукта в корзине
      * @param $basketItems
      * @return bool
      */
     private function checkCategory($basketItems)
     {
         foreach ($basketItems as $basketItem) {
+
             $productId = $basketItem->getProductId();
             $productCategory = Iblock::getProductCategory($productId);
 
@@ -158,11 +202,13 @@ class Calculate {
     }
 
     /**
+     * Получаем настройки
      * @throws \Bitrix\Main\ArgumentNullException
      */
     private function getSettings()
     {
         $moduleSettings = Option::getForModule($this->moduleId);
+
         foreach ($moduleSettings as $optionsId => $optionVal) {
             if (is_array($this->settings[$optionsId])) {
                 $this->settings[$optionsId] = explode(',', $optionVal);

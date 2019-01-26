@@ -8,6 +8,8 @@ use Bitrix\Main\LoaderException;
 
 class Iblock  {
 
+    //todo написать выбор инфоблока в свойства модуля
+
     const CATALOG_CODE = 'aspro_mshop_catalog';
 
     public function __construct()
@@ -36,6 +38,7 @@ class Iblock  {
         while ($category = $categories->fetch()) {
             $categoryList[$category['ID']] = $category['NAME'];
         }
+
         return $categoryList;
     }
 
@@ -65,9 +68,12 @@ class Iblock  {
     {
         $obCategory = \CIBlockElement::GetElementGroups($productId, false, ['ID', 'IBLOCK_SECTION_ID']);
         $categories = [];
+
         while($category = $obCategory->Fetch()) {
             $categories[] = $category;
         }
+
         return $categories;
     }
+
 }
